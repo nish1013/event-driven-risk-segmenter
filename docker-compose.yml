@@ -1,0 +1,90 @@
+name: risk-segmenter
+
+x-api-healthcheck: &api-healthcheck
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+  interval: 2s
+  timeout: 3s
+  retries: 30
+
+x-api-depends: &api-depends
+  postgres:
+    condition: service_healthy
+  pubsub-init:
+    condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: risk_segmenter
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local}
+      RECORDING_DB_PASSWORD: ${RECORDING_DB_PASSWORD:-recording-local}
+      RECORDING_MIGRATOR_DB_PASSWORD: ${RECORDING_MIGRATOR_DB_PASSWORD:-recording-migrator-local}
+      SEGMENTER_DB_PASSWORD: ${SEGMENTER_DB_PASSWORD:-segmenter-local}
+      SEGMENTER_MIGRATOR_DB_PASSWORD: ${SEGMENTER_MIGRATOR_DB_PASSWORD:-segmenter-migrator-local}
+      NOTIFIER_DB_PASSWORD: ${NOTIFIER_DB_PASSWORD:-notifier-local}
+      NOTIFIER_MIGRATOR_DB_PASSWORD: ${NOTIFIER_MIGRATOR_DB_PASSWORD:-notifier-migrator-local}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d risk_segmenter"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:589.0.0-emulators
+    command: >
+      gcloud beta emulators pubsub start
+      --host-port=0.0.0.0:8085
+      --project=${PUBSUB_PROJECT_ID:-risk-segmenter-local}
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8085"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  pubsub-init:
+    build: ./infra/pubsub
+    environment:
+      PUBSUB_EMULATOR_HOST: pubsub:8085
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID:-risk-segmenter-local}
+    depends_on:
+      pubsub:
+        condition: service_healthy
+
+  recording-api:
+    build: ./services/recording
+    environment:
+      DATABASE_URL: postgresql+psycopg://recording:${RECORDING_DB_PASSWORD:-recording-local}@postgres:5432/risk_segmenter
+      MIGRATION_DATABASE_URL: postgresql+psycopg://recording_migrator:${RECORDING_MIGRATOR_DB_PASSWORD:-recording-migrator-local}@postgres:5432/risk_segmenter
+    ports:
+      - "8001:8000"
+    healthcheck: *api-healthcheck
+    depends_on: *api-depends
+
+
+  segmenter-api:
+    build: ./services/segmenter
+    environment:
+      DATABASE_URL: postgresql+psycopg://segmenter:${SEGMENTER_DB_PASSWORD:-segmenter-local}@postgres:5432/risk_segmenter
+      MIGRATION_DATABASE_URL: postgresql+psycopg://segmenter_migrator:${SEGMENTER_MIGRATOR_DB_PASSWORD:-segmenter-migrator-local}@postgres:5432/risk_segmenter
+    ports:
+      - "8002:8000"
+    healthcheck: *api-healthcheck
+    depends_on: *api-depends
+
+  notifier-api:
+    build: ./services/notifier
+    environment:
+      DATABASE_URL: postgresql+psycopg://notifier:${NOTIFIER_DB_PASSWORD:-notifier-local}@postgres:5432/risk_segmenter
+      MIGRATION_DATABASE_URL: postgresql+psycopg://notifier_migrator:${NOTIFIER_MIGRATOR_DB_PASSWORD:-notifier-migrator-local}@postgres:5432/risk_segmenter
+    ports:
+      - "8003:8000"
+    healthcheck: *api-healthcheck
+    depends_on: *api-depends
