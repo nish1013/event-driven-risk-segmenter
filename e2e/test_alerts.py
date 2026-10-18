@@ -1,15 +1,13 @@
 import json
-import time
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import pytest
-from stack import compose, get_alerts, get_segment, post_activity
+from stack import compose, get_alerts, get_segment, post_activity, wait_for
 
 FIXTURE = Path(__file__).parent / "fixtures" / "chargeback.json"
-TIMEOUT_S = 30.0
 
 
 @pytest.fixture
@@ -24,16 +22,6 @@ def notifier_stopped() -> Iterator[None]:
 def post_chargeback(merchant: str) -> None:
     body = json.loads(FIXTURE.read_text()) | {"activityId": f"a-{uuid4()}", "merchantId": merchant}
     assert post_activity(body)[0] == 201
-
-
-def wait_for[T](read: Callable[[], T], done: Callable[[T], bool], what: str) -> T:
-    deadline = time.monotonic() + TIMEOUT_S
-    while time.monotonic() < deadline:
-        value = read()
-        if done(value):
-            return value
-        time.sleep(0.5)
-    pytest.fail(f"{what} not reached within {TIMEOUT_S}s")
 
 
 def wait_for_band(merchant: str, expected: str) -> str | None:

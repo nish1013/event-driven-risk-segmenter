@@ -4,28 +4,9 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-from stack import get_alerts, get_segment, post_activity, post_resolution
+from stack import activity, get_alerts, get_segment, post_activity, post_resolution
 
 SCORING_TIMEOUT_S = 30.0
-
-
-def activity(merchant: str, activity_type: str, occurred_at: str) -> dict[str, Any]:
-    payloads: dict[str, dict[str, str]] = {
-        "chargeback": {
-            "transactionId": f"t-{uuid4()}",
-            "amount": "120.00",
-            "currency": "GBP",
-            "reasonCode": "4837",
-        },
-        "failed_login": {"userId": "u-1", "method": "password"},
-    }
-    return {
-        "activityId": f"a-{uuid4()}",
-        "merchantId": merchant,
-        "type": activity_type,
-        "occurredAt": occurred_at,
-        "payload": payloads[activity_type],
-    }
 
 
 def wait_until(merchant: str, done: Callable[[dict[str, Any]], bool]) -> dict[str, Any]:
