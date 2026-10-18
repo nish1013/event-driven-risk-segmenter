@@ -109,3 +109,33 @@ Built:    The same calls with `http://localhost` before the port:
 Why:      curl 8.7.1 rejects a URL with no host. It exits with code 3 (URL malformed) and sends no
           request (checked against the running stack).
 Undo:     None in code. Only the plan's verification text changes.
+
+## D8. Dead-letter depth is read by pulling and releasing (PR 6, 2026-10-18)
+
+Plan:     Architecture, Dead letters: "`dead-letter-monitor` (#37) checks every dead-letter
+          subscription every 60 s and logs at `ERROR` when depth is above 0". #37: "reads each
+          dead-letter subscription's depth".
+Built:    `infra/pubsub/monitor.py` pulls every message on each dead-letter subscription, counts
+          them, and releases them at once (ack deadline 0). Nothing is acked. Depth above 0 logs
+          `<subscription> holds <n> dead-lettered message(s)` at `ERROR`.
+          `e2e/test_dead_letter_monitor.py` checks twice and reads the same depth both times.
+Why:      The emulator serves no backlog metric. Pub/Sub exposes depth only through Cloud
+          Monitoring (`num_undelivered_messages`), which #37 leaves to v2. While a check holds the
+          messages, a replay running at that moment can see fewer of them and stop early; running
+          the replay again picks up the rest.
+Undo:     Read `num_undelivered_messages` from Cloud Monitoring in `depth()`, which needs real GCP.
+
+## D9. The Pub/Sub-down test pauses the emulator instead of stopping it (PR 6, 2026-10-18)
+
+Plan:     Tests, end to end: "Pub/Sub stopped: `POST` still 201; published after restart" (#2).
+Built:    `e2e/test_delivery.py::test_2_pubsub_down_post_201_published_after` runs
+          `docker compose pause pubsub`, posts a chargeback (201, no segment), then unpauses and
+          reads band `medium`.
+Why:      The emulator holds topics and subscriptions in memory only. After
+          `docker compose stop pubsub` and `start`, `GET /v1/projects/risk-segmenter-local/topics`
+          returns no topics (checked against the running stack). The relay would then publish
+          into nothing until `pubsub-init` ran again, and any message published between topic and
+          subscription creation would reach no subscriber. Real Pub/Sub keeps its topology through
+          an outage, so a pause is the closer model.
+Undo:     Stop and start the container, re-run `pubsub-init` before the relay reconnects, and
+          accept that the test then measures emulator recovery as well as the outbox.
