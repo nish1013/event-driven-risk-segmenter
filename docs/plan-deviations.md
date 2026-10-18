@@ -1,6 +1,6 @@
 # Plan deviations
 
-Open for the owner's review. Not decisions.
+Where the build departs from [plan.md](plan.md), and why. A deviation becomes a decision only once it is added to [decisions.md](decisions.md).
 
 ## D1. Two Postgres roles per service (PR 1, 2026-10-18)
 
