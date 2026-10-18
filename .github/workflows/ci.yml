@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - project: services/recording
+            typed: src
+          - project: services/segmenter
+            typed: src
+          - project: services/notifier
+            typed: src
+          - project: .
+            typed: e2e infra/pubsub/init.py
+    defaults:
+      run:
+        working-directory: ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.11"
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy ${{ matrix.typed }}
+      - if: matrix.project != '.'
+        run: uv run pytest tests/unit
+
+  stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.11"
+      - run: docker compose up --build --wait
+      - name: integration tests
+        run: |
+          for service in recording segmenter notifier; do
+            uv run --locked --directory "services/$service" pytest tests/integration
+          done
+      - run: uv run --locked pytest e2e
+      - if: failure()
+        run: docker compose logs

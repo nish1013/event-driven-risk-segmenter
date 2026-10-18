@@ -1,0 +1,33 @@
+[project]
+name = "risk-segmenter"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "google-cloud-pubsub>=2.43.0",
+    "mypy>=2.4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.17.1",
+    "types-protobuf>=7.35.1.20260906",
+]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+extend-exclude = ["services"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+strict = true
+
+[[tool.mypy.overrides]]
+module = ["google.cloud.*"]
+ignore_missing_imports = true
+
+[tool.pytest]
+testpaths = ["e2e"]
