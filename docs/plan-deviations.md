@@ -136,6 +136,6 @@ Why:      The emulator holds topics and subscriptions in memory only. After
           returns no topics (checked against the running stack). The relay would then publish
           into nothing until `pubsub-init` ran again, and any message published between topic and
           subscription creation would reach no subscriber. Real Pub/Sub keeps its topology through
-          an outage, so a pause is the closer model.
+          an outage, so a pause is the closer match.
 Undo:     Stop and start the container, re-run `pubsub-init` before the relay reconnects, and
           accept that the test then measures emulator recovery as well as the outbox.
