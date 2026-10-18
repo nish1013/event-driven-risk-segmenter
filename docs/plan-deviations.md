@@ -139,3 +139,25 @@ Why:      The emulator holds topics and subscriptions in memory only. After
           an outage, so a pause is the closer match.
 Undo:     Stop and start the container, re-run `pubsub-init` before the relay reconnects, and
           accept that the test then measures emulator recovery as well as the outbox.
+
+## D10. The README starts the stack with `--build` (PR 7, 2026-10-18)
+
+Plan:     README outline, "Run it: `docker compose up --wait`, three `curl` calls".
+Built:    `docker compose up --build --wait`, as CI runs it.
+Why:      The Compose project is named `risk-segmenter`, so every checkout shares image names.
+          Without `--build`, Compose reuses any image built earlier from another checkout or an
+          older commit, and the stack can run code other than the code cloned.
+Undo:     Drop `--build` from the README. A machine that has never built these images gets the
+          same result; one that has must run `docker compose build` first.
+
+## D11. The README repeats the segment and alerts reads (PR 7, 2026-10-18)
+
+Plan:     Verification: the `POST` returns 201, then the segment read returns
+          `{"band":"medium",…}`, with no wait between them.
+Built:    The README calls `curl` as in D3 and D7, and says scoring and alerting run after the 201,
+          so the next reads can return 404 `merchant m-100 not seen` and `[]` for a second or two
+          and are repeated.
+Why:      Scoring is asynchronous by design (brief: recording never waits on scoring). In a fresh
+          clone the segment read sent straight after the 201 returned 404; the band was `medium`
+          0.2 s later (checked against the running stack).
+Undo:     None in code. Only the README and the plan's verification text differ.
