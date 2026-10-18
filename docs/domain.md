@@ -79,9 +79,11 @@ because facts aged out of a window.
 | `m-100` `high`, chargebacks at 09-01, 09-05 and 09-10. No open check | `failed_login` at 10-20. Recompute gives `low` | Band stays `high`. Check `c-1` opens, proposing `low`. `ManualRiskCheckRequired` |
 | `m-300` `high`, check `c-1` open, proposing `medium` | Another recompute gives `low` | Band stays `high`. `c-1` now proposes `low`. No event |
 | `m-400` `medium`, check `c-2` open, proposing `low` | `kyc_expired`. Recompute gives `high` | Band `high`. `c-2` closed as `superseded`. `RiskSegmentChanged` `medium -> high`. `RiskCheckResolved` |
+| `m-100` `high`, check `c-1` open, proposing `medium` | `kyc_expired`. Recompute gives `high` | Band stays `high`. `c-1` closed as `superseded`. `RiskCheckResolved` (#44) |
 
 Decided: rules run on every event. A lower result while a check is open updates its proposed band
-and emits nothing (#27). A rise closes the check as `superseded` and emits `RiskCheckResolved` (#28).
+and emits nothing (#27). A rise closes the check as `superseded` and emits `RiskCheckResolved` (#28). So does a
+recompute that gives the current band (#44).
 
 ### US4: Resolve a risk check (Segmenter)
 

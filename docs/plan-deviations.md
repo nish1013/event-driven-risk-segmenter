@@ -47,6 +47,8 @@ Undo:     Accept any content type as JSON in `recording.entrypoints.api`. That w
 
 ## D4. A rule band equal to the band closes the open check (PR 4, 2026-10-18)
 
+Decided as #44 on 2026-10-18.
+
 Plan:     policy-v1.md P4, row "same | either | nothing changes", restated by the plan's Domain
           contract. An open check stays open, with its lower proposal, when a recompute gives the
           current band.
