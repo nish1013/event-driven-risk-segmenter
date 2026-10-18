@@ -8,7 +8,7 @@ from sqlalchemy import Engine
 from segmenter.adapters.database import PostgresProbe
 from segmenter.adapters.segment_queries import SqlSegmentQueries
 from segmenter.adapters.tables import checks
-from segmenter.entrypoints.api import create_app
+from segmenter.entrypoints.api import create_app, sql_resolver
 
 
 def test_us5_segment_with_open_check(engine: Engine, merchant: str) -> None:
@@ -38,7 +38,9 @@ def test_us5_segment_with_open_check(engine: Engine, merchant: str) -> None:
                 },
             ],
         )
-    client = TestClient(create_app(PostgresProbe(engine), SqlSegmentQueries(engine)))
+    client = TestClient(
+        create_app(PostgresProbe(engine), SqlSegmentQueries(engine), sql_resolver(engine))
+    )
 
     body = client.get(f"/merchants/{merchant}/segment").json()
 
@@ -54,6 +56,8 @@ def test_us5_segment_with_open_check(engine: Engine, merchant: str) -> None:
 
 
 def test_us5_unknown_merchant_404(engine: Engine) -> None:
-    client = TestClient(create_app(PostgresProbe(engine), SqlSegmentQueries(engine)))
+    client = TestClient(
+        create_app(PostgresProbe(engine), SqlSegmentQueries(engine), sql_resolver(engine))
+    )
 
     assert client.get(f"/merchants/m-{uuid4()}/segment").status_code == 404

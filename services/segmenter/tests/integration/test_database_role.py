@@ -5,13 +5,13 @@ from sqlalchemy.exc import ProgrammingError
 
 from segmenter.adapters.database import PostgresProbe
 from segmenter.adapters.segment_queries import SqlSegmentQueries
-from segmenter.entrypoints.api import create_app
+from segmenter.entrypoints.api import create_app, sql_resolver
 
 
 def test_healthz_ok_against_postgres(engine: Engine) -> None:
-    response = TestClient(create_app(PostgresProbe(engine), SqlSegmentQueries(engine))).get(
-        "/healthz"
-    )
+    response = TestClient(
+        create_app(PostgresProbe(engine), SqlSegmentQueries(engine), sql_resolver(engine))
+    ).get("/healthz")
 
     assert response.status_code == 200
 

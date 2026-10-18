@@ -9,7 +9,7 @@ from sqlalchemy import Connection, Engine
 from segmenter.adapters.outbox import SqlOutbox
 from segmenter.adapters.processed_events import SqlProcessedEvents
 from segmenter.adapters.segment_repository import SegmentRepository, SqlSegmentRepository
-from segmenter.domain.events import RiskSegmentChanged
+from segmenter.domain.events import SegmenterEvent
 
 
 class UnitOfWork(ABC):
@@ -41,7 +41,7 @@ class UnitOfWork(ABC):
     def rollback(self) -> None: ...
 
     @abstractmethod
-    def _add_to_outbox(self, event: RiskSegmentChanged) -> None: ...
+    def _add_to_outbox(self, event: SegmenterEvent) -> None: ...
 
     @abstractmethod
     def _commit(self) -> None: ...
@@ -76,7 +76,7 @@ class SqlUnitOfWork(UnitOfWork):
     def rollback(self) -> None:
         self._open_connection().rollback()
 
-    def _add_to_outbox(self, event: RiskSegmentChanged) -> None:
+    def _add_to_outbox(self, event: SegmenterEvent) -> None:
         self._outbox.add(event)
 
     def _commit(self) -> None:

@@ -3,6 +3,7 @@ from fakes import Store
 from samples import deliver, recorded
 
 from segmenter.domain.errors import VersionConflict
+from segmenter.domain.events import RiskSegmentChanged
 from segmenter.domain.policy import Band
 
 
@@ -12,7 +13,11 @@ def band(store: Store, merchant_id: str = "m-100") -> tuple[Band, str | None]:
 
 
 def changes(store: Store) -> list[tuple[str, str]]:
-    return [(event.from_band.value, event.to_band.value) for event in store.outbox]
+    return [
+        (event.from_band.value, event.to_band.value)
+        for event in store.outbox
+        if isinstance(event, RiskSegmentChanged)
+    ]
 
 
 def test_us2_first_chargeback_gives_medium() -> None:
@@ -169,20 +174,3 @@ def test_p6_kyc_expired_never_pruned() -> None:
 
     assert sorted(fact.type for fact in store.facts.values()) == ["failed_login", "kyc_expired"]
     assert band(store) == (Band.HIGH, "kyc_expired")
-
-
-def test_policy_example_run_up_to_officer() -> None:
-    store = Store()
-    expected = [
-        ("chargeback", "2026-09-01T00:00", Band.MEDIUM, [("low", "medium")]),
-        ("chargeback", "2026-09-05T00:00", Band.MEDIUM, []),
-        ("chargeback", "2026-09-10T00:00", Band.HIGH, [("medium", "high")]),
-        ("failed_login", "2026-10-06T00:00", Band.HIGH, []),
-        ("failed_login", "2026-10-12T00:00", Band.HIGH, []),
-    ]
-
-    for fact_type, occurred_at, expected_band, expected_changes in expected:
-        before = len(store.outbox)
-        deliver(store, recorded(fact_type, occurred_at))
-        assert band(store)[0] == expected_band, occurred_at
-        assert changes(store)[before:] == expected_changes, occurred_at

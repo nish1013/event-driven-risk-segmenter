@@ -48,7 +48,8 @@ Reordering P2 rows changes the recorded rule. It is a policy change and gets a n
 | --- | --- | --- | --- |
 | higher | no | band = rule band | `RiskSegmentChanged` |
 | higher | yes | band = rule band, check `superseded` (#28) | `RiskCheckResolved`, `RiskSegmentChanged` |
-| same | either | nothing changes | none |
+| same | no | nothing changes | none |
+| same | yes | band unchanged, check `superseded` (#44) | `RiskCheckResolved` |
 | lower | no | band held, check opens with proposal = rule band (#18) | `ManualRiskCheckRequired` |
 | lower | yes | band held, proposal = rule band (#27) | none |
 
