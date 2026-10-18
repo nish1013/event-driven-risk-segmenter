@@ -91,6 +91,32 @@ services:
     healthcheck: *api-healthcheck
     depends_on: *api-depends
 
+  segmenter-worker:
+    build: ./services/segmenter
+    command: ["python", "-m", "segmenter.entrypoints.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://segmenter:${SEGMENTER_DB_PASSWORD:-segmenter-local}@postgres:5432/risk_segmenter
+      PUBSUB_EMULATOR_HOST: pubsub:8085
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID:-risk-segmenter-local}
+    depends_on:
+      segmenter-api:
+        condition: service_healthy
+      pubsub-init:
+        condition: service_completed_successfully
+
+  segmenter-relay:
+    build: ./services/segmenter
+    command: ["python", "-m", "segmenter.entrypoints.relay"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://segmenter:${SEGMENTER_DB_PASSWORD:-segmenter-local}@postgres:5432/risk_segmenter
+      PUBSUB_EMULATOR_HOST: pubsub:8085
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID:-risk-segmenter-local}
+    depends_on:
+      segmenter-api:
+        condition: service_healthy
+      pubsub-init:
+        condition: service_completed_successfully
+
   notifier-api:
     build: ./services/notifier
     environment:

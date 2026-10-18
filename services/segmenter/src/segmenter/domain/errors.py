@@ -1,0 +1,2 @@
+class VersionConflict(RuntimeError):
+    pass

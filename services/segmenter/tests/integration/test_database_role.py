@@ -4,11 +4,14 @@ from sqlalchemy import Engine, text
 from sqlalchemy.exc import ProgrammingError
 
 from segmenter.adapters.database import PostgresProbe
+from segmenter.adapters.segment_queries import SqlSegmentQueries
 from segmenter.entrypoints.api import create_app
 
 
 def test_healthz_ok_against_postgres(engine: Engine) -> None:
-    response = TestClient(create_app(PostgresProbe(engine))).get("/healthz")
+    response = TestClient(create_app(PostgresProbe(engine), SqlSegmentQueries(engine))).get(
+        "/healthz"
+    )
 
     assert response.status_code == 200
 

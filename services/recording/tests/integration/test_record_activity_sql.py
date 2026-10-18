@@ -20,7 +20,7 @@ CONCURRENT = 20
 def chargeback(activity_id: str) -> dict[str, Any]:
     return {
         "activityId": activity_id,
-        "merchantId": "m-100",
+        "merchantId": f"m-{activity_id}",
         "type": "chargeback",
         "occurredAt": "2026-10-01T10:00:00Z",
         "payload": {

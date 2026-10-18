@@ -31,6 +31,9 @@ Why:      Scoring needs the Segmenter worker, which the plan builds in PR 3 (`fe
           No PR 2 test can observe a band.
 Undo:     None needed once PR 3 adds the scoring assertion. Moving the whole row to PR 3 would
           take only this entry.
+Closed:   PR 3, 2026-10-18. `e2e/test_segment_rules.py::test_us1_segmenter_stopped_post_fast_scored_after_restart`
+          stops `segmenter-worker`, posts a chargeback (201 in under 200 ms, no segment yet),
+          starts the worker and reads band `medium` from the segment API.
 
 ## D3. Verification `curl` needs a JSON content type (PR 2, 2026-10-18)
 
