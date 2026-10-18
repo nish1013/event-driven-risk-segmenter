@@ -5,6 +5,7 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.20.0",
     "fastapi>=0.143.3",
+    "google-cloud-pubsub>=2.43.0",
     "psycopg[binary]>=3.3.6",
     "sqlalchemy>=2.1.5",
     "uvicorn>=0.54.0",
@@ -16,6 +17,7 @@ dev = [
     "mypy>=2.4.0",
     "pytest>=9.1.1",
     "ruff>=0.17.1",
+    "types-protobuf>=7.35.1.20260906",
 ]
 
 [build-system]
@@ -34,6 +36,10 @@ known-third-party = ["alembic"]
 
 [tool.mypy]
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["google.cloud.*"]
+ignore_missing_imports = true
 
 [tool.pytest]
 testpaths = ["tests"]

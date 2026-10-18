@@ -1,0 +1,12 @@
+{
+  "activityId": "a-1",
+  "merchantId": "m-100",
+  "type": "chargeback",
+  "occurredAt": "2026-10-01T10:00:00Z",
+  "payload": {
+    "transactionId": "t-9",
+    "amount": "120.00",
+    "currency": "GBP",
+    "reasonCode": "4837"
+  }
+}
