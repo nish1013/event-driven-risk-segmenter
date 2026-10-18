@@ -8,6 +8,7 @@ from typing import Any
 
 RECORDING_URL = os.environ.get("RECORDING_URL", "http://localhost:8001")
 SEGMENTER_URL = os.environ.get("SEGMENTER_URL", "http://localhost:8002")
+NOTIFIER_URL = os.environ.get("NOTIFIER_URL", "http://localhost:8003")
 REPO_ROOT = Path(__file__).parent.parent
 
 
@@ -23,6 +24,15 @@ def post_activity(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
 
 def get_segment(merchant_id: str) -> tuple[int, dict[str, Any]]:
     return _send(urllib.request.Request(f"{SEGMENTER_URL}/merchants/{merchant_id}/segment"))
+
+
+def get_alerts(merchant_id: str, status: str | None = None) -> list[dict[str, Any]]:
+    query = "" if status is None else f"?status={status}"
+    with urllib.request.urlopen(
+        f"{NOTIFIER_URL}/merchants/{merchant_id}/alerts{query}", timeout=5
+    ) as response:
+        alerts: list[dict[str, Any]] = json.loads(response.read())
+    return alerts
 
 
 def post_resolution(check_id: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:

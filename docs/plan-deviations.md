@@ -78,3 +78,34 @@ Why:      Resolving writes the segment under its version number (aggregates.md A
           removing each guard alone, then both.
 Undo:     None in code. Making the status condition the only guard would mean resolving without
           raising the segment version, which A2 and I9 rule out.
+
+## D6. One guarded upsert records both check events (PR 5, 2026-10-18)
+
+Plan:     Architecture, Notifier: "`ManualRiskCheckRequired`: insert alert `open` `ON CONFLICT
+          (check_id) DO NOTHING`. `RiskCheckResolved`: upsert the alert as `closed`. Close only rows
+          that are `open` (I14)." Tests, integration row "'Closed' then a replayed 'opened' leaves
+          the alert closed | I14 | the close-only-open rule is removed". aggregates.md A2,
+          `on_segmenter_event`: load the alert by `checkId`, then call `alert.open()` or
+          `alert.close(decision)`.
+Built:    Both check events go through one statement in `SqlAlertRepository.record`:
+          `INSERT … ON CONFLICT (check_id) DO UPDATE … WHERE alerts.status = 'open'`. The handler
+          builds the alert its event implies (`Alert.of`) and records it, with no load first. A
+          late "opened" finds a closed row and changes nothing, as the plan states.
+          `test_us8_i14_replayed_opened_after_close_stays_closed` fails with the `WHERE` removed.
+Why:      Under the split statements a late "opened" is stopped by `DO NOTHING`, never by the
+          close-only-open rule, so the I14 replay test cannot fail when that rule is removed. A
+          load before the write also sees no row while another delivery's insert for the same
+          check is uncommitted, so the outcome has to be decided inside the statement
+          (`test_i13_concurrent_opened_then_resolved_one_closed_alert` and its reverse).
+Undo:     Split `record` into `DO NOTHING` for "opened" and the guarded upsert for "resolved", and
+          name `DO NOTHING` as the guard of the I14 replay test.
+
+## D7. Verification `curl` calls need a host (PR 5, 2026-10-18)
+
+Plan:     Verification: `curl -s ':8003/merchants/m-100/alerts?status=open'` -> `[]`. The `:8001`
+          and `:8002` calls use the same form.
+Built:    The same calls with `http://localhost` before the port:
+          `curl -s 'http://localhost:8003/merchants/m-100/alerts?status=open'` -> `[]`, 200.
+Why:      curl 8.7.1 rejects a URL with no host. It exits with code 3 (URL malformed) and sends no
+          request (checked against the running stack).
+Undo:     None in code. Only the plan's verification text changes.
