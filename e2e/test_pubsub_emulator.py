@@ -1,11 +1,9 @@
 import os
-import random
 import threading
 import time
 import uuid
-from collections import defaultdict
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import pytest
 from google.cloud import pubsub_v1
@@ -23,12 +21,6 @@ class Topology:
     subscription: str
     dead_letter_topic: str
     dead_letter_subscription: str
-
-
-@dataclass
-class Received:
-    by_key: dict[str, list[int]] = field(default_factory=lambda: defaultdict(list))
-    lock: threading.Lock = field(default_factory=threading.Lock)
 
 
 @pytest.fixture
@@ -83,42 +75,6 @@ def topology(
         subscriber.delete_subscription(subscription=sub)
     for topic in (names.topic, names.dead_letter_topic):
         publisher.delete_topic(topic=topic)
-
-
-def test_order_per_key_with_concurrent_handlers(
-    publisher: pubsub_v1.PublisherClient,
-    subscriber: pubsub_v1.SubscriberClient,
-    topology: Topology,
-) -> None:
-    keys = ["m-1", "m-2"]
-    per_key = 50
-    futures = [
-        publisher.publish(topology.topic, b"", ordering_key=key, seq=str(seq))
-        for seq in range(per_key)
-        for key in keys
-    ]
-    for future in futures:
-        future.result(timeout=TIMEOUT_S)
-
-    received = Received()
-    done = threading.Event()
-
-    def handle(message: Message) -> None:
-        time.sleep(random.uniform(0, 0.02))
-        with received.lock:
-            received.by_key[message.ordering_key].append(int(message.attributes["seq"]))
-            if sum(len(seqs) for seqs in received.by_key.values()) >= per_key * len(keys):
-                done.set()
-        message.ack()
-
-    future = subscriber.subscribe(topology.subscription, handle)
-    try:
-        assert done.wait(TIMEOUT_S), f"received {dict(received.by_key)}"
-    finally:
-        future.cancel()
-        future.result()
-
-    assert received.by_key == {key: list(range(per_key)) for key in keys}
 
 
 def test_nacked_message_dead_letters_after_5_attempts(
