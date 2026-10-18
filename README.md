@@ -122,3 +122,7 @@ uv run --locked --directory services/<service> mypy src
 ```
 
 The end-to-end tests stop, pause and restart containers. Run them on a stack used for nothing else.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
