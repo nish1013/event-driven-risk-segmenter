@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from segmenter.adapters.segment_queries import SegmentView
 from segmenter.entrypoints.api import create_app
 
 
@@ -11,14 +12,19 @@ class FakeProbe:
         return self._reachable
 
 
+class NoSegments:
+    def segment(self, merchant_id: str) -> SegmentView | None:
+        return None
+
+
 def test_healthz_ok_when_database_reachable() -> None:
-    response = TestClient(create_app(FakeProbe(reachable=True))).get("/healthz")
+    response = TestClient(create_app(FakeProbe(reachable=True), NoSegments())).get("/healthz")
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 
 def test_healthz_503_when_database_unreachable() -> None:
-    response = TestClient(create_app(FakeProbe(reachable=False))).get("/healthz")
+    response = TestClient(create_app(FakeProbe(reachable=False), NoSegments())).get("/healthz")
 
     assert response.status_code == 503
