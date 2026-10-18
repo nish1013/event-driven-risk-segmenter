@@ -25,6 +25,16 @@ def get_segment(merchant_id: str) -> tuple[int, dict[str, Any]]:
     return _send(urllib.request.Request(f"{SEGMENTER_URL}/merchants/{merchant_id}/segment"))
 
 
+def post_resolution(check_id: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    request = urllib.request.Request(
+        f"{SEGMENTER_URL}/risk-checks/{check_id}/resolution",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    return _send(request)
+
+
 def compose(*args: str) -> None:
     subprocess.run(["docker", "compose", *args], cwd=REPO_ROOT, check=True, capture_output=True)
 
