@@ -182,7 +182,7 @@ in hand. Preconditions, validation and response behaviour are acceptance criteri
 | --- | --- | --- | --- | --- |
 | I1 | An `activityId` names at most one activity | Immediate | Primary key on the activity id | Yes: two retries of `a-1` at once |
 | I2 | A recorded activity is never changed or removed (#21) | Immediate | No update or delete path. The service's DB role has insert and select only | No |
-| I3 | Every recorded activity has exactly one `ActivityRecorded` event | Immediate | Activity and outbox row in one transaction (#2). Unique activity id on the outbox | No, given I1 |
+| I3 | Every recorded activity has exactly one `ActivityRecorded` event, written in the same transaction | Immediate | Activity and outbox row in one transaction (#2). Unique activity id on the outbox. A sent row is deleted after 7 days (#40), so the row proves the event only until then | No, given I1 |
 | I4 | Every `ActivityRecorded` event is published | Eventual | Relay retries until ack (#3) | No |
 | I5 | A merchant has exactly one segment | Immediate | Primary key on the merchant id | Yes: two first events for a new merchant |
 | **I6** | **A merchant's band is never lower than its rule band** | Immediate | Fact insert and recompute in one transaction. Version number on the segment (#9) | **Yes, the hard one.** Two events for `m-100` on two instances. Each misses the other's fact, and the last write sets a band below the rule band |
@@ -190,7 +190,7 @@ in hand. Preconditions, validation and response behaviour are acceptance criteri
 | I8 | An open check proposes a band lower than the merchant's band | Immediate | Checked by the segment on every save | No, given I6's guard |
 | I9 | A resolved check never changes | Immediate | Resolve only an open check, under the segment version number | Yes: two officers resolve `c-1` at once |
 | I10 | A consumer applies each `eventId` at most once (#4) | Immediate | Primary key on processed event id, written with the state change | Yes: a redelivery while the first is still running |
-| I11 | Every band change, check opened and check resolved has exactly one Segmenter event | Immediate | State change and outbox row in one transaction (#2) | No |
+| I11 | Every band change, check opened and check resolved has exactly one Segmenter event, written in the same transaction | Immediate | State change and outbox row in one transaction (#2). Cleanup as in I3 (#40) | No |
 | I12 | Segmenter holds every recorded activity a rule can still read: all `kyc_expired` facts, and every other fact inside its type's window | Eventual | Repaired by `ActivityRecorded`. Pruning removes only facts older than their type's window, never `kyc_expired` (#6, #25, #38) | No |
 | I13 | A check has at most one alert | Immediate | Unique check id on alerts | Yes: a replayed "opened" while "closed" is applied |
 | I14 | A closed check alert never reopens (#29) | Immediate | Status moves only `open -> closed` | No |
@@ -244,15 +244,15 @@ officer --HTTP--> Segmenter (resolve, read)        officer --HTTP--> Notifier (r
 
 | Aggregate | Root | Context | Identity | Guards invariants | Tables | Guard |
 | --- | --- | --- | --- | --- | --- | --- |
-| Activity | `Activity` | Recording | `activityId` | I1, I2, I3 | `activities`, `outbox` | PK on `activities.activity_id`. Unique `outbox.activity_id`. Insert-only DB role |
-| Merchant risk | `Segment` | Segmenter | `merchantId` | I5, I6, I7, I8, I9, I11 | `segments`, `facts`, `checks`, `outbox` | PK on `segments.merchant_id`. `segments.version_number` checked on every save. Partial unique index on `checks(merchant_id)` where open |
-| Check alert | `Alert` | Notifier | `checkId` | I13, I14 | `alerts` | Unique `alerts.check_id`. Close only where `open` |
+| Activity | `Activity` | Recording | `activityId` | I1, I2, I3 | `activities` | PK on `activities.activity_id`. Insert-only DB role |
+| Merchant risk | `Segment` | Segmenter | `merchantId` | I5, I6, I7, I8, I9, I11 | `segments`, `facts`, `checks` | PK on `segments.merchant_id`. `segments.version_number` checked on every save. Partial unique index on `checks(merchant_id)` where open |
+| Alert | `Alert` | Notifier | `alertId`. A check alert is also found by `checkId` | I13, I14 | `alerts` | Unique `alerts.check_id`. Close only where `open` |
 
-Plain data, no aggregate:
+Owned by the unit of work, not by an aggregate ([aggregates.md](aggregates.md) A5, #42):
 
-| Table | Why it is not an aggregate |
+| Table | Why it is outside every aggregate |
 | --- | --- |
-| `alerts` rows of kind `segment_changed` | No immediate invariant. I16 is eventual |
+| `outbox`, one per producer | It holds the events of many roots. The relay and cleanup (#40) write across them, and no invariant reads `sent_at` |
 | `processed_events`, one per consumer | I10 spans the whole set, so a unique key guards it. It is written in the same transaction as the aggregate it applies to |
 
 **Why facts sit inside `Segment`:** I6 compares the band with the facts. Both must change in one
@@ -296,5 +296,5 @@ published first.
 | Each fact lives in one place, or has a written reason | Pass. Three second places, each with a reason in the table above |
 | No invariant exists only to keep two copies in agreement | Pass with a reason. I12 and I15 keep copies in agreement. Both copies are deliberate: removing them means one service asking another, which the brief forbids |
 | Every arrow is ask by default; every copy names its reason | Pass. No asks. Two copies, both with reasons |
-| No transaction changes two aggregates | Pass. Resolving a check changes the check and the band, both inside `Segment` |
+| No transaction changes two aggregates | Pass. Resolving a check changes the check and the band, both inside `Segment`. Pruning deletes only that merchant's facts. The relay and cleanup write only unit-of-work tables |
 | Every requested guard fits the model | Pass. The unique keys guard inserted rows. Status and band changes go through the version number or a conditional update |

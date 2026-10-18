@@ -11,7 +11,7 @@ Status: draft
 **The brief.** [brief.md](brief.md). Recording must never wait on scoring or notification. A failed
 Notifier must never undo a band. Each service owns its data.
 
-**Owner's decisions:** [decisions.md](decisions.md) #1-#41. Stories and invariants:
+**Owner's decisions:** [decisions.md](decisions.md) #1-#42. Stories and invariants:
 [domain.md](domain.md). This plan restates them; it decides nothing new.
 
 **Facts checked read-only (2026-10-18):**
@@ -60,6 +60,10 @@ The rules live in [policy-v1.md](policy-v1.md), sections P1-P6. Code and tests c
 cases tested for every P2 rule: count one below and at the threshold. A fact at exactly
 `anchor - window`, and one 1s older.
 
+## Aggregates and units of work
+
+[aggregates.md](aggregates.md), sections A1-A6 (#42). Code and tests cite those ids.
+
 ## Validation and responses
 
 | Endpoint | Status | When |
@@ -92,20 +96,20 @@ services/
     pyproject.toml, uv.lock, Dockerfile, alembic/
     src/recording/
       domain/                Activity, payload schemas, same-body rule
-      service_layer/         record_activity handler
+      service_layer/         record_activity handler, unit of work
       adapters/              activity repository, outbox, Pub/Sub publisher
       entrypoints/           api.py, relay.py
     tests/unit, integration, e2e
   segmenter/
     src/segmenter/
       domain/                Segment root, Check, policy v1 rules, band decision
-      service_layer/         on_activity_recorded, resolve_risk_check
+      service_layer/         on_activity_recorded, resolve_risk_check, unit of work
       adapters/              segment repository, outbox, processed events, publisher, subscriber
       entrypoints/           api.py, worker.py, relay.py, replay.py
   notifier/
     src/notifier/
       domain/                Alert, open/close rules
-      service_layer/         on_segmenter_event
+      service_layer/         on_segmenter_event, unit of work
       adapters/              alert repository, processed events, alert log port (#12), subscriber
       entrypoints/           api.py, worker.py, replay.py
 e2e/                         cross-service tests over HTTP and Pub/Sub
@@ -133,10 +137,10 @@ BEGIN
   INSERT segments (merchant_id, 'low', version 0) ON CONFLICT DO NOTHING
   INSERT facts ON CONFLICT DO NOTHING
   load segment and open check; count facts per rule window, one query (#39)
-  decide (domain, policy-v1.md P3-P4), prune per type (P6, #38)
+  decide (domain, policy-v1.md P3-P4), prune this merchant's facts per type (P6, #38)
   UPDATE segments SET …, version_number = v + 1 WHERE merchant_id = :m AND version_number = :v
-                                                     -- 0 rows: ROLLBACK, nack, redelivered
-  write check changes, outbox rows
+                                                     -- 0 rows: ROLLBACK, retry (A4)
+  write check changes, outbox rows in raise order (A3)
 COMMIT, then ack
 ```
 
@@ -171,7 +175,7 @@ result:   band medium, 3 chargebacks stored. I6 broken.
 ```
 
 **The guard.** Both read `version_number = 7`. A commits `8`. B's update matches 0 rows, rolls back,
-is redelivered and recomputes with all facts.
+retries (A4) and recomputes with all facts.
 
 **Why simpler options fail.**
 
@@ -202,6 +206,8 @@ Each test names the story or invariant it proves.
 | Two concurrent lower recomputes give one open check | I7 | the partial unique index is removed and the version check is bypassed |
 | Two concurrent resolves of `c-1`: one 200, one 409 | I9 | the `status = 'open'` condition is removed |
 | One event delivered twice gives one change | I10 | the processed-events insert is removed |
+| A worker meets one forced version conflict: the event is applied on the rerun, with no nack | A4 | the conflict nacks at once |
+| Approving a check writes `RiskCheckResolved` before `RiskSegmentChanged` in the outbox | A3 | the unit of work writes events out of raise order |
 | Relay killed after publish, before `sent_at`: consumer state changes once | #3, I10 | dedup is removed |
 | The count query returns P2's counts at each window boundary | #39 | the bound becomes exclusive |
 | With 10,000 failed logins for one merchant, `EXPLAIN` of the count query shows an index scan on `(merchant_id, type, occurred_at)` | #38, #39 | the index is dropped or the query loads rows |
