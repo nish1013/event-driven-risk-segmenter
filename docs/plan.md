@@ -4,7 +4,7 @@ Three Python services keep a live risk band for every merchant: Recording, Segme
 share one Postgres database, with a schema per service, and talk only through Pub/Sub. v1 runs on
 Docker Compose with the Pub/Sub emulator (#16).
 
-Status: draft
+Status: locked, 2026-10-18
 
 ## Context
 
@@ -303,3 +303,7 @@ curl -s -XPOST :8001/activities -d @e2e/fixtures/chargeback.json   201
 curl -s :8002/merchants/m-100/segment                     {"band":"medium",…}
 curl -s ':8003/merchants/m-100/alerts?status=open'        []
 ```
+
+## Deviations
+
+None yet. Each deviation from this plan is recorded here, dated, with its reason.
