@@ -56,7 +56,10 @@ def activity_recorded() -> Iterator[TopicTap]:
 
 
 def test_us1_recorded_activity_published_once(activity_recorded: TopicTap) -> None:
-    body = json.loads(FIXTURE.read_text()) | {"activityId": f"a-{uuid4()}"}
+    body = json.loads(FIXTURE.read_text()) | {
+        "activityId": f"a-{uuid4()}",
+        "merchantId": f"m-{uuid4()}",
+    }
 
     created_status, created = post_activity(body)
     repeat_status, repeat = post_activity(body)
