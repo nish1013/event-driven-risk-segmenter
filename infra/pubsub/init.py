@@ -19,6 +19,10 @@ class SubscriptionSpec:
     topic: str
     name: str
 
+    @property
+    def dead_letter(self) -> str:
+        return f"{self.name}-dead-letter"
+
 
 TOPICS = ["activity-recorded", "segmenter-events"]
 SUBSCRIPTIONS = [
@@ -36,13 +40,12 @@ def main() -> None:
         _create_topic(publisher, publisher.topic_path(project_id, topic))
 
     for spec in SUBSCRIPTIONS:
-        dead_letter = f"{spec.name}-dead-letter"
-        dead_letter_topic = publisher.topic_path(project_id, dead_letter)
+        dead_letter_topic = publisher.topic_path(project_id, spec.dead_letter)
         _create_topic(publisher, dead_letter_topic)
         _create_subscription(
             subscriber,
             {
-                "name": subscriber.subscription_path(project_id, dead_letter),
+                "name": subscriber.subscription_path(project_id, spec.dead_letter),
                 "topic": dead_letter_topic,
                 "message_retention_duration": DEAD_LETTER_RETENTION,
             },

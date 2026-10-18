@@ -19,7 +19,7 @@ jobs:
           - project: services/notifier
             typed: src
           - project: .
-            typed: e2e infra/pubsub/init.py
+            typed: e2e infra/pubsub/init.py infra/pubsub/monitor.py
     defaults:
       run:
         working-directory: ${{ matrix.project }}

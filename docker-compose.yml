@@ -139,3 +139,14 @@ services:
         condition: service_healthy
       pubsub-init:
         condition: service_completed_successfully
+
+  dead-letter-monitor:
+    build: ./infra/pubsub
+    command: ["uv", "run", "--frozen", "--script", "monitor.py"]
+    environment:
+      PUBSUB_EMULATOR_HOST: pubsub:8085
+      PUBSUB_PROJECT_ID: ${PUBSUB_PROJECT_ID:-risk-segmenter-local}
+      DEAD_LETTER_CHECK_EVERY_S: "60"
+    depends_on:
+      pubsub-init:
+        condition: service_completed_successfully
