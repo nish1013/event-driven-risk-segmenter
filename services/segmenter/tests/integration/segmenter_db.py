@@ -3,11 +3,15 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from fastapi.testclient import TestClient
 from sqlalchemy import Engine, func, select, text
 
+from segmenter.adapters.database import PostgresProbe
+from segmenter.adapters.segment_queries import SqlSegmentQueries
 from segmenter.adapters.tables import outbox, segments
 from segmenter.domain.policy import POLICY_V1
 from segmenter.domain.segment import Fact
+from segmenter.entrypoints.api import create_app, sql_resolver
 from segmenter.service_layer.on_activity_recorded import (
     ActivityRecorded,
     Applied,
@@ -91,3 +95,9 @@ def wait_for_lock_waiters(engine: Engine, statement_prefix: str, expected: int) 
             if time.monotonic() > deadline:
                 return False
             time.sleep(0.02)
+
+
+def api(engine: Engine) -> TestClient:
+    return TestClient(
+        create_app(PostgresProbe(engine), SqlSegmentQueries(engine), sql_resolver(engine))
+    )
