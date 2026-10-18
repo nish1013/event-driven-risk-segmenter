@@ -1,5 +1,6 @@
 import os
 from collections.abc import Iterator
+from uuid import uuid4
 
 import pytest
 from sqlalchemy import Engine, create_engine
@@ -9,6 +10,11 @@ DEFAULT_URL = "postgresql+psycopg://notifier:notifier-local@localhost:5432/risk_
 
 @pytest.fixture
 def engine() -> Iterator[Engine]:
-    engine = create_engine(os.environ.get("RECORDING_DATABASE_URL", DEFAULT_URL))
+    engine = create_engine(os.environ.get("NOTIFIER_DATABASE_URL", DEFAULT_URL))
     yield engine
     engine.dispose()
+
+
+@pytest.fixture
+def merchant() -> str:
+    return f"m-{uuid4()}"
