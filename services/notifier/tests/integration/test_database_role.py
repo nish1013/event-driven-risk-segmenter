@@ -3,12 +3,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import ProgrammingError
 
+from notifier.adapters.alert_queries import SqlAlertQueries
 from notifier.adapters.database import PostgresProbe
 from notifier.entrypoints.api import create_app
 
 
 def test_healthz_ok_against_postgres(engine: Engine) -> None:
-    response = TestClient(create_app(PostgresProbe(engine))).get("/healthz")
+    response = TestClient(create_app(PostgresProbe(engine), SqlAlertQueries(engine))).get(
+        "/healthz"
+    )
 
     assert response.status_code == 200
 
