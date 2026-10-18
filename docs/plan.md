@@ -4,7 +4,7 @@ Three Python services keep a live risk band for every merchant: Recording, Segme
 share one Postgres database, with a schema per service, and talk only through Pub/Sub. v1 runs on
 Docker Compose with the Pub/Sub emulator (#16).
 
-Status: locked, 2026-10-18
+Status: locked, 2026-10-18. Revised 2026-10-18: delivery order is best-effort (#43)
 
 ## Context
 
@@ -18,8 +18,9 @@ Notifier must never undo a band. Each service owns its data.
 
 - Python 3.14.7, uv 0.12.11, Docker 29.2.1, Compose v5.0.2 installed. `gh` signed in as `nish1013`.
 - No `gcloud` installed. The emulator runs from the `google-cloud-cli:emulators` image instead.
-- Unconfirmed: whether the Pub/Sub emulator honours ordering keys and dead-letter policies. PR 1
-  proves it before anything depends on it.
+- Unconfirmed: whether the Pub/Sub emulator honours dead-letter policies. PR 1 proves it before
+  anything depends on it. The emulator does not hold an ordering key after a nack; delivery order is
+  best-effort and nothing depends on it (#43).
 
 ## Stack
 
@@ -249,9 +250,9 @@ Each test names the story or invariant it proves.
    Alembic per service, roles and grants, CI, an emulator check.
 
    **Accept when:** `docker compose up --wait` is healthy. CI runs ruff, mypy and pytest on every
-   service. The emulator check publishes 100 messages on 2 ordering keys and asserts per-key order, and
-   nacks one message until it lands on the dead-letter topic after 5 attempts. If the emulator fails
-   either check, building stops and the owner decides the fallback.
+   service. The emulator check nacks one message until it lands on the dead-letter topic after 5
+   attempts. It asserts no per-key delivery order (#43). If the emulator fails the check, building
+   stops and the owner decides the fallback.
 
 2. **`feat/record-activity`**: US1, I1-I4. Recording API, payload schemas, outbox, relay.
 
