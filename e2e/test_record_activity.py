@@ -1,32 +1,15 @@
 import json
 import os
 import time
-import urllib.error
-import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
 from uuid import uuid4
 
 import pytest
 from google.cloud import pubsub_v1
+from stack import post_activity
 
-RECORDING_URL = os.environ.get("RECORDING_URL", "http://localhost:8001")
 FIXTURE = Path(__file__).parent / "fixtures" / "chargeback.json"
-
-
-def post_activity(body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
-    request = urllib.request.Request(
-        f"{RECORDING_URL}/activities",
-        data=json.dumps(body).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=5) as response:
-            return response.status, json.loads(response.read())
-    except urllib.error.HTTPError as error:
-        return error.code, json.loads(error.read())
 
 
 class TopicTap:
