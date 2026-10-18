@@ -44,3 +44,35 @@ Why:      `curl -d` sends `application/x-www-form-urlencoded`. FastAPI then does
           as JSON and returns 422 (checked against the running stack).
 Undo:     Accept any content type as JSON in `recording.entrypoints.api`. That widens the endpoint
           to form posts from browsers, so the header is the smaller change.
+
+## D4. A rule band equal to the band closes the open check (PR 4, 2026-10-18)
+
+Plan:     policy-v1.md P4, row "same | either | nothing changes", restated by the plan's Domain
+          contract. An open check stays open, with its lower proposal, when a recompute gives the
+          current band.
+Built:    `Segment.apply` closes the open check as `superseded` and emits `RiskCheckResolved` when
+          the rule band equals the band, exactly as a rise does (#28). With no open check, an equal
+          rule band still changes nothing. `test_d4_same_band_with_check_supersedes_it`.
+Why:      The kept proposal goes stale, and approving it breaks I6. Run: `m-100` `high` by
+          `chargeback_3_in_30d`, check open proposing `medium`. `kyc_expired` arrives, so the rule
+          band is `high`, equal to the band. Under P4 as written the check stays at `medium`.
+          `approve_lower` then sets the band to `medium` below the rule band `high`. #27 rejects
+          a recompute on approval, so the check has to be closed on the event.
+Undo:     Drop the equal-band branch in `Segment.apply`. I6 then needs another guard on approval,
+          for example 409 when the proposal is below the current rule band.
+
+## D5. The I9 concurrency test fails only with both of its guards removed (PR 4, 2026-10-18)
+
+Plan:     Tests, integration row "Two concurrent resolves of `c-1`: one 200, one 409 | I9 | the
+          `status = 'open'` condition is removed".
+Built:    `test_i9_concurrent_resolves_one_200_one_409` fails (`[200, 200]`) when the
+          `status = 'open'` condition on the check update is removed and the version check on the
+          segment update is bypassed. With either guard in place it passes. This matches the
+          plan's own I7 row, "the partial unique index is removed and the version check is
+          bypassed".
+Why:      Resolving writes the segment under its version number (aggregates.md A2, domain.md I9
+          "under the segment version number"). The second resolve then matches 0 segment rows,
+          reruns (A4) and finds the check resolved: 409 without the status condition. Checked by
+          removing each guard alone, then both.
+Undo:     None in code. Making the status condition the only guard would mean resolving without
+          raising the segment version, which A2 and I9 rule out.
