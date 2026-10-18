@@ -5,7 +5,8 @@ from typing import Self
 from uuid import UUID
 
 from segmenter.adapters.segment_repository import SegmentRepository
-from segmenter.domain.events import RiskSegmentChanged
+from segmenter.domain.check import Check
+from segmenter.domain.events import SegmenterEvent
 from segmenter.domain.policy import Band, Policy
 from segmenter.domain.segment import Fact, FactCounts, Segment
 from segmenter.service_layer.unit_of_work import UnitOfWork
@@ -24,8 +25,9 @@ class SegmentRow:
 class Store:
     segments: dict[str, SegmentRow] = field(default_factory=dict)
     facts: dict[str, Fact] = field(default_factory=dict)
+    checks: dict[UUID, Check] = field(default_factory=dict)
     processed: set[UUID] = field(default_factory=set)
-    outbox: list[RiskSegmentChanged] = field(default_factory=list)
+    outbox: list[SegmenterEvent] = field(default_factory=list)
 
 
 class FakeSegmentRepository(SegmentRepository):
@@ -53,7 +55,16 @@ class FakeSegmentRepository(SegmentRepository):
             version_number=row.version_number,
             updated_at=row.updated_at,
             fact_counts=self._count(merchant_id, policy),
+            checks=[
+                check
+                for check in self._store.checks.values()
+                if check.merchant_id == merchant_id and check.is_open
+            ],
         )
+
+    def _merchant_of(self, check_id: UUID) -> str | None:
+        check = self._store.checks.get(check_id)
+        return None if check is None else check.merchant_id
 
     def _update(self, segment: Segment) -> bool:
         if self._conflicts and self._conflicts[0] > 0:
@@ -69,6 +80,21 @@ class FakeSegmentRepository(SegmentRepository):
             segment.version_number + 1,
             segment.updated_at,
         )
+        return True
+
+    def _insert_check(self, check: Check) -> bool:
+        if any(
+            other.merchant_id == check.merchant_id and other.is_open
+            for other in self._store.checks.values()
+        ):
+            return False
+        self._store.checks[check.check_id] = check
+        return True
+
+    def _update_open_check(self, check: Check) -> bool:
+        if not self._store.checks[check.check_id].is_open:
+            return False
+        self._store.checks[check.check_id] = check
         return True
 
     def _prune(self, merchant_id: str, policy: Policy, anchor: datetime) -> int:
@@ -125,7 +151,7 @@ class FakeUnitOfWork(UnitOfWork):
     def rollback(self) -> None:
         self._working = Store()
 
-    def _add_to_outbox(self, event: RiskSegmentChanged) -> None:
+    def _add_to_outbox(self, event: SegmenterEvent) -> None:
         self._working.outbox.append(event)
 
     def _commit(self) -> None:

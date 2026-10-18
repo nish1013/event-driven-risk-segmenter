@@ -1,5 +1,6 @@
 import time
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import Engine, func, select, text
@@ -47,12 +48,23 @@ def segment_row(engine: Engine, merchant_id: str) -> tuple[str, str | None, int]
     return row.band, row.rule, row.version_number
 
 
-def changes(engine: Engine, merchant_id: str) -> list[tuple[str, str]]:
+def events(engine: Engine, merchant_id: str) -> list[dict[str, Any]]:
     with engine.connect() as connection:
-        bodies = connection.scalars(
-            select(outbox.c.body).where(outbox.c.ordering_key == merchant_id).order_by(outbox.c.id)
+        return list(
+            connection.scalars(
+                select(outbox.c.body)
+                .where(outbox.c.ordering_key == merchant_id)
+                .order_by(outbox.c.id)
+            )
         )
-        return [(body["from"], body["to"]) for body in bodies]
+
+
+def changes(engine: Engine, merchant_id: str) -> list[tuple[str, str]]:
+    return [
+        (body["from"], body["to"])
+        for body in events(engine, merchant_id)
+        if body["eventType"] == "RiskSegmentChanged"
+    ]
 
 
 def segment_count(engine: Engine, merchant_id: str) -> int:

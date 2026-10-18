@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import Connection, delete, select, update
 
 from segmenter.adapters.tables import outbox
-from segmenter.domain.events import RiskSegmentChanged
+from segmenter.domain.events import SegmenterEvent
 
 SEGMENTER_EVENTS_TOPIC = "segmenter-events"
 
@@ -23,7 +23,7 @@ class SqlOutbox:
     def __init__(self, connection: Connection) -> None:
         self._connection = connection
 
-    def add(self, event: RiskSegmentChanged) -> None:
+    def add(self, event: SegmenterEvent) -> None:
         self._connection.execute(
             outbox.insert().values(
                 event_id=event.event_id,
